@@ -14,9 +14,23 @@ type Task struct {
 }
 type Tasks []Task
 
-func decide(p *string, t *Tasks) (int16, error) {
+func decide(p *string, t *Tasks, extraConfig *map[string]string) (int16, error) {
 	// tasks := Tasks{Task{Id: "", Description: ""}}
-	sysprompt, err := llmhelpergo.TemplateRender(t, routerChooser)
+	url, found := (*extraConfig)["url"]
+	if !found {
+		url = "https://api.openai.com/v1/chat/completions"
+	}
+	model, found := (*extraConfig)["model"]
+	if !found {
+		model = "gpt-3.5-turbo-0125"
+	}
+	prompt, found := (*extraConfig)["prompt"]
+	if !found {
+		prompt = routerChooser
+	}
+
+	sysprompt, err := llmhelpergo.TemplateRender(t, prompt)
+	logrus.Info("here is the decder system prompt: ", sysprompt)
 	if err != nil {
 		logrus.Error(err)
 
@@ -29,8 +43,8 @@ func decide(p *string, t *Tasks) (int16, error) {
 			Content: p,
 			Role:    "user",
 		}},
-		URL:   "https://api.openai.com/v1/chat/completions",
-		Model: "gpt-3.5-turbo-0125",
+		URL:   url,
+		Model: model,
 	}
 	prediction, err := llm.Predict()
 	if err != nil {

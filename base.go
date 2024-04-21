@@ -15,24 +15,35 @@ type route struct {
 type routes []*route
 
 type group struct {
-	Routes *routes
-	Groups []*group
-	Nested bool
+	Description string
+	Routes      *routes
+	Groups      []*group
+	Nested      bool
 }
 
 func validateRoutes(d *string, r *routes) {
-	if len(*r) == 5 {
+	if r != nil && len(*r) == 5 {
 		panic("cannot have more than 5 routes per group ")
 	}
-	if *d == "" {
+	if d != nil && *d == "" {
 		panic("the descriptions must not be empty!")
 
 	}
+}
+func NewGroup(Description string, Nested bool) *group {
+	return &group{
+		Description: Description,
+		Routes:      &routes{},
+		Groups:      []*group{},
+		Nested:      Nested,
+	}
+
 }
 func (g *group) AddGroup(ng *group) {
 	g.Groups = append(g.Groups, ng)
 }
 func (g *group) UseRoute(d string, h *llmhelpergo.ChainType) {
+
 	validateRoutes(&d, g.Routes)
 	*g.Routes = append(*g.Routes, &route{
 		Description: d,
@@ -43,15 +54,16 @@ func (g *group) UseRoute(d string, h *llmhelpergo.ChainType) {
 type groups []*group
 
 type LlmEngine interface {
-	UseRoute(string, llmhelpergo.ChainType)
 	AddGroup(group)
 	Run() error
+	SetDeciderUrl(string)
+	SetDeciderModel(string)
+	SetDeciderPrompt(string)
 }
 
 type Engine struct {
-	Routes      routes
 	Groups      groups
-	ExtraConfig map[string]string
+	ExtraConfig *map[string]string
 }
 
 func New() *Engine {
@@ -61,37 +73,97 @@ func New() *Engine {
 func (e *Engine) AddGroup(g *group) {
 	e.Groups = append(e.Groups, g)
 }
-
-func (e *Engine) UseRoute(d string, h *llmhelpergo.ChainType) {
-	validateRoutes(&d, &e.Routes)
-
-	e.Routes = append(e.Routes, &route{
-		Description: d,
-		handlerFunc: h,
-	})
+func (e *Engine) SetDeciderUrl(s string) {
+	(*e.ExtraConfig)["url"] = s
 }
-
+func (e *Engine) SetDeciderModel(s string) {
+	(*e.ExtraConfig)["model"] = s
+}
+func (e *Engine) SetDeciderPrompt(s string) {
+	(*e.ExtraConfig)["prompt"] = s
+}
 func (e *Engine) Run(p string, h *llmhelpergo.Messages) (string, error) {
-	tasks := Tasks{}
-	for i, v := range e.Routes {
+	lastGroups := e.Groups
+	lastRoutes := &routes{}
+	isgroup := true
 
-		(*v.handlerFunc.Llm).ReplaceMessages(h)
-		tasks = append(tasks, Task{
-			Id:          strconv.Itoa(i),
-			Description: v.Description,
-		})
-	}
-	//here i get to decide which route will we choose to use
-	handlerInt, err := decide(&p, &tasks)
-	if err != nil {
-		logrus.Error(err)
-		return "", ErrMakingDecisions
-	}
-	answer, err := e.Routes[handlerInt].handlerFunc.Predict(&p)
-	if err != nil {
-		logrus.Error(err)
-		return "", ErrHandlerMakingPrediction
-	}
+	for i := 0; i < 100; i++ {
 
-	return *answer, nil
+		tasks := Tasks{}
+		if isgroup {
+			logrus.Info("before loop in is group: ", lastGroups)
+			for i, v := range lastGroups {
+
+				// (*v.handlerFunc.Llm).ReplaceMessages(h)
+
+				tasks = append(tasks, Task{
+					Id:          strconv.Itoa(i),
+					Description: v.Description,
+				})
+			}
+		} else {
+			for i, v := range *lastRoutes {
+
+				(*v.handlerFunc.Llm).ReplaceMessages(h)
+
+				tasks = append(tasks, Task{
+					Id:          strconv.Itoa(i),
+					Description: v.Description,
+				})
+			}
+		}
+		logrus.Info("tasks are set: ", tasks)
+
+		//here i get to decide which route will we choose to use
+		var handlerInt int16
+		var err error
+		if len(tasks) == 1 {
+			logrus.Info("setting handler to 0")
+			handlerInt = 0
+		} else {
+			logrus.Info("going in for a decide on these: ", tasks)
+			handlerInt, err = decide(&p, &tasks, e.ExtraConfig)
+			if err != nil {
+				logrus.Error(err)
+				return "", ErrMakingDecisions
+			}
+			logrus.Info("deciders decision: ", handlerInt)
+		}
+
+		if isgroup {
+			if i == 0 {
+				if e.Groups[handlerInt].Nested {
+					isgroup = true
+					lastGroups = e.Groups[handlerInt].Groups
+				} else {
+					isgroup = false
+					lastRoutes = e.Groups[handlerInt].Routes
+				}
+			} else {
+
+				if lastGroups[handlerInt].Nested {
+					isgroup = true
+					lastGroups = lastGroups[handlerInt].Groups
+				} else {
+					isgroup = false
+					lastRoutes = e.Groups[handlerInt].Routes
+				}
+			}
+
+			continue
+		} else {
+
+			isgroup = false
+			// answer, err := (*lastRoutes)[handlerInt].handlerFunc.Predict(&p)
+			// if err != nil {
+			// 	logrus.Error(err)
+			// 	return "", ErrHandlerMakingPrediction
+			// }
+			// return *answer, nil
+			logrus.Info("answer is the following handler: ", (*lastRoutes)[handlerInt].Description)
+			break
+		}
+
+	}
+	return "", ErrHandlerMakingPrediction
 }

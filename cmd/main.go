@@ -9,6 +9,10 @@ import (
 
 func main() {
 	lhr := llmhelpergorouter.New()
+	lhr.SetDeciderModel("")
+	lhr.SetDeciderPrompt("")
+	lhr.SetDeciderUrl("")
+
 	os.Setenv("OPENAI_KEY", "")
 	// message := "hello world"
 	llm := &llmhelpergo.GeneralLlm{
@@ -21,7 +25,12 @@ func main() {
 	chain.Use(llmhelpergo.SampleAgent)
 	chain.Use(llmhelpergo.SampleAgent2)
 	chain.Use(llmhelpergo.SampleAgent3)
-
-	lhr.UseRoute("", chain)
-	lhr.Run("", nil)
+	group1 := llmhelpergorouter.NewGroup("", false)
+	group1.UseRoute("greetings and general purpose questions", chain)
+	group1.UseRoute("in matters of manipulating the abstract paragraph of the paper ", chain)
+	group1.UseRoute("in matters of manipulating the body paragraph of the paper ", chain)
+	group1.UseRoute("in matters of manipulating the q and a paragraph of the paper ", chain)
+	group1.UseRoute("in matters of manipulating idea generation ", chain)
+	lhr.AddGroup(group1)
+	lhr.Run("hi", nil)
 }
