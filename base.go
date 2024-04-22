@@ -10,6 +10,7 @@ import (
 type route struct {
 	Description string
 	handlerFunc *llmhelpergo.ChainType
+	ID          string
 }
 
 type routes []*route
@@ -42,12 +43,13 @@ func NewGroup(Description string, Nested bool) *group {
 func (g *group) AddGroup(ng *group) {
 	g.Groups = append(g.Groups, ng)
 }
-func (g *group) UseRoute(d string, h *llmhelpergo.ChainType) {
+func (g *group) UseRoute(d string, h *llmhelpergo.ChainType, i string) {
 
 	validateRoutes(&d, g.Routes)
 	*g.Routes = append(*g.Routes, &route{
 		Description: d,
 		handlerFunc: h,
+		ID:          i,
 	})
 }
 
@@ -59,17 +61,21 @@ type LlmEngine interface {
 	SetDeciderUrl(string)
 	SetDeciderModel(string)
 	SetDeciderPrompt(string)
+	SetCallbackFunc(func(*string))
 }
 
 type Engine struct {
-	Groups      groups
-	ExtraConfig *map[string]string
+	Groups       groups
+	ExtraConfig  *map[string]string
+	CallBackFunc func(*string)
 }
 
 func New() *Engine {
 	return &Engine{}
 }
-
+func (e *Engine) SetCallbackFunc(f func(*string)) {
+	e.CallBackFunc = f
+}
 func (e *Engine) AddGroup(g *group) {
 	e.Groups = append(e.Groups, g)
 }
@@ -153,15 +159,17 @@ func (e *Engine) Run(p string, h *llmhelpergo.Messages) (string, error) {
 			continue
 		} else {
 
-			isgroup = false
-			// answer, err := (*lastRoutes)[handlerInt].handlerFunc.Predict(&p)
-			// if err != nil {
-			// 	logrus.Error(err)
-			// 	return "", ErrHandlerMakingPrediction
-			// }
-			// return *answer, nil
 			logrus.Info("answer is the following handler: ", (*lastRoutes)[handlerInt].Description)
-			break
+			isgroup = false
+			answer, err := (*lastRoutes)[handlerInt].handlerFunc.Predict(&p)
+
+			if err != nil {
+				logrus.Error(err)
+				return "", ErrHandlerMakingPrediction
+			}
+			e.CallBackFunc(&(*lastRoutes)[handlerInt].ID)
+			return *answer, nil
+
 		}
 
 	}
