@@ -167,7 +167,10 @@ func (e *Engine) Run(p string, h *llmhelpergo.Messages) (string, error) {
 				logrus.Error(err)
 				return "", ErrHandlerMakingPrediction
 			}
-			e.CallBackFunc(&(*lastRoutes)[handlerInt].ID)
+			if e.CallBackFunc != nil {
+
+				e.CallBackFunc(&(*lastRoutes)[handlerInt].ID)
+			}
 			return *answer, nil
 
 		}
