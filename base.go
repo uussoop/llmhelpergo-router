@@ -62,22 +62,27 @@ type LlmEngine interface {
 	SetDeciderModel(string)
 	SetDeciderPrompt(string)
 	SetCallbackFunc(func(*string))
+	SetUserID(*int)
 }
 
 type Engine struct {
 	Groups       groups
 	ExtraConfig  *map[string]string
-	CallBackFunc func(*string)
+	CallBackFunc func(*int, *string)
+	UserID       *int
 }
 
 func New() *Engine {
 	return &Engine{}
 }
-func (e *Engine) SetCallbackFunc(f func(*string)) {
+func (e *Engine) SetCallbackFunc(f func(*int, *string)) {
 	e.CallBackFunc = f
 }
 func (e *Engine) AddGroup(g *group) {
 	e.Groups = append(e.Groups, g)
+}
+func (e *Engine) SetUserID(u *int) {
+	e.UserID = u
 }
 func (e *Engine) SetDeciderUrl(s string) {
 	(*e.ExtraConfig)["url"] = s
@@ -167,9 +172,9 @@ func (e *Engine) Run(p string, h *llmhelpergo.Messages) (string, error) {
 				logrus.Error(err)
 				return "", ErrHandlerMakingPrediction
 			}
-			if e.CallBackFunc != nil {
+			if e.CallBackFunc != nil && e.UserID != nil {
 
-				e.CallBackFunc(&(*lastRoutes)[handlerInt].ID)
+				e.CallBackFunc(e.UserID, &(*lastRoutes)[handlerInt].ID)
 			}
 			return *answer, nil
 
