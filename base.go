@@ -167,14 +167,14 @@ func (e *Engine) Run(p string, h *llmhelpergo.Messages) (string, error) {
 			logrus.Info("answer is the following handler: ", (*lastRoutes)[handlerInt].Description)
 			isgroup = false
 			answer, err := (*lastRoutes)[handlerInt].handlerFunc.Predict(&p)
+			if e.CallBackFunc != nil && e.UserID != nil {
+
+				e.CallBackFunc(e.UserID, &(*lastRoutes)[handlerInt].ID)
+			}
 
 			if err != nil {
 				logrus.Error(err)
 				return "", ErrHandlerMakingPrediction
-			}
-			if e.CallBackFunc != nil && e.UserID != nil {
-
-				e.CallBackFunc(e.UserID, &(*lastRoutes)[handlerInt].ID)
 			}
 			return *answer, nil
 
