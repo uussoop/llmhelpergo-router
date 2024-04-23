@@ -68,20 +68,20 @@ type LlmEngine interface {
 type Engine struct {
 	Groups       groups
 	ExtraConfig  *map[string]string
-	CallBackFunc func(*int, *string)
-	UserID       *int
+	CallBackFunc func(*string, *string)
+	UserID       *string
 }
 
 func New() *Engine {
 	return &Engine{}
 }
-func (e *Engine) SetCallbackFunc(f func(*int, *string)) {
+func (e *Engine) SetCallbackFunc(f func(*string, *string)) {
 	e.CallBackFunc = f
 }
 func (e *Engine) AddGroup(g *group) {
 	e.Groups = append(e.Groups, g)
 }
-func (e *Engine) SetUserID(u *int) {
+func (e *Engine) SetUserID(u *string) {
 	e.UserID = u
 }
 func (e *Engine) SetDeciderUrl(s string) {
